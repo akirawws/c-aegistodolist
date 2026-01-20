@@ -2,8 +2,6 @@
 #include <windowsx.h>
 #include <gdiplus.h>
 #include <string>
-#include <fstream>
-#include <shellapi.h>
 #include <cwctype>
 #include "core/TaskManager.h"
 #include "ui/Renderer.h"
@@ -15,56 +13,30 @@ using namespace std;
 TaskManager core;
 Renderer ui;
 static Screen currentScreen = Screen::Menu;
+static bool showModal = false;
+static wstring modalTitle = L"";
+static wstring modalDesc = L"";
+static bool editingTitle = false;
+static int modalYear = 0;
+static int modalMonth = 0;
+static int modalDay = 0;
 
-static const wchar_t* NEW_TASK_FILE = L"new_task.txt";
-static bool awaitingTaskFromFile = false;
-static FILETIME lastTaskFileWriteTime = { 0,0 };
-
-static wstring Trim(const wstring& s) {
-    size_t start = 0;
-    while (start < s.size() && iswspace(s[start])) start++;
-    size_t end = s.size();
-    while (end > start && iswspace(s[end - 1])) end--;
-    return s.substr(start, end - start);
+static wstring FormatDateYMD(int y, int m, int d) {
+    wchar_t buf[11];
+    wsprintfW(buf, L"%04d-%02d-%02d", y, m, d);
+    return buf;
 }
 
-static bool TryReadWholeFile(const wchar_t* path, wstring& out) {
-    wifstream f(path);
-    if (!f.is_open()) return false;
-    wstring content, line;
-    while (getline(f, line)) {
-        content += line;
-        content += L"\n";
-    }
-    f.close();
-    out = content;
-    return true;
-}
-
-static void WriteFileText(const wchar_t* path, const wstring& text) {
-    wofstream f(path);
-    if (!f.is_open()) return;
-    f << text;
-    f.close();
-}
-
-static bool GetFileWriteTime(const wchar_t* path, FILETIME& ft) {
-    WIN32_FILE_ATTRIBUTE_DATA data;
-    if (!GetFileAttributesExW(path, GetFileExInfoStandard, &data)) return false;
-    ft = data.ftLastWriteTime;
-    return true;
-}
-
-static void StartAddTaskViaTxt(HWND hwnd) {
-    WriteFileText(NEW_TASK_FILE, L"");
-
-    FILETIME ft;
-    if (GetFileWriteTime(NEW_TASK_FILE, ft)) lastTaskFileWriteTime = ft;
-
-    ShellExecuteW(hwnd, L"open", L"notepad.exe", NEW_TASK_FILE, NULL, SW_SHOWNORMAL);
-
-    awaitingTaskFromFile = true;
-    SetTimer(hwnd, 1, 500, NULL);
+static void OpenModal() {
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    showModal = true;
+    modalTitle = L"";
+    modalDesc = L"";
+    editingTitle = true;
+    modalYear = (int)st.wYear;
+    modalMonth = (int)st.wMonth;
+    modalDay = (int)st.wDay;
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -79,6 +51,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         SelectObject(memDC, memBM);
 
         ui.DrawUI(memDC, rc.right, rc.bottom, core.GetTasks(), currentScreen);
+        if (showModal) {
+            ui.DrawModal(memDC, rc.right, rc.bottom, modalTitle, modalDesc, editingTitle, modalYear, modalMonth, modalDay);
+        }
 
         BitBlt(hdc, 0, 0, rc.right, rc.bottom, memDC, 0, 0, SRCCOPY);
         DeleteObject(memBM); DeleteDC(memDC);
@@ -95,62 +70,112 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             const auto& btn = ui.buttons[i];
             
             if (btn.rect.Contains((REAL)x, (REAL)y)) {
-                
-                if (btn.name == L"MENU_ADD") {
-                    StartAddTaskViaTxt(hwnd);
+                if (showModal) {
+                    if (btn.name == L"MODAL_TITLE") {
+                        editingTitle = true;
+                    }
+                    else if (btn.name == L"MODAL_DESC") {
+                        editingTitle = false;
+                    }
+                    else if (btn.name == L"MODAL_CANCEL") {
+                        showModal = false;
+                        modalTitle = L"";
+                        modalDesc = L"";
+                    }
+                    else if (btn.name == L"MODAL_SAVE") {
+                        if (!modalTitle.empty()) {
+                            core.AddTask(modalTitle, modalDesc, FormatDateYMD(modalYear, modalMonth, modalDay));
+                            showModal = false;
+                            modalTitle = L"";
+                            modalDesc = L"";
+                            if (currentScreen == Screen::Menu) {
+                                currentScreen = Screen::Tasks;
+                            }
+                        }
+                    }
+                    else if (btn.name == L"CAL_PREV") {
+                        modalMonth--;
+                        if (modalMonth < 1) { modalMonth = 12; modalYear--; }
+                        if (modalDay > 28) modalDay = 1;
+                    }
+                    else if (btn.name == L"CAL_NEXT") {
+                        modalMonth++;
+                        if (modalMonth > 12) { modalMonth = 1; modalYear++; }
+                        if (modalDay > 28) modalDay = 1;
+                    }
+                    else if (btn.name == L"CAL_DAY") {
+                        if (btn.id > 0) modalDay = btn.id;
+                    }
                 }
-                else if (btn.name == L"MENU_TASKS") {
-                    currentScreen = Screen::Tasks;
-                }
-                else if (btn.name == L"BACK") {
-                    currentScreen = Screen::Menu;
-                }
-                else if (btn.name == L"ADD") {
-                    StartAddTaskViaTxt(hwnd);
-                }
-                else if (btn.name == L"DEL") {
-                    core.DeleteTask(btn.id);
-                }
-                else if (btn.name == L"TOGGLE") {
-                    core.ToggleTask(btn.id);
+                else {
+                    if (btn.name == L"MENU_ADD") {
+                        OpenModal();
+                    }
+                    else if (btn.name == L"MENU_TASKS") {
+                        currentScreen = Screen::Tasks;
+                    }
+                    else if (btn.name == L"MENU_ABOUT") {
+                        currentScreen = Screen::About;
+                    }
+                    else if (btn.name == L"BACK") {
+                        currentScreen = Screen::Menu;
+                    }
+                    else if (btn.name == L"ADD") {
+                        OpenModal();
+                    }
+                    else if (btn.name == L"DEL") {
+                        core.DeleteTask(btn.id);
+                    }
+                    else if (btn.name == L"TOGGLE") {
+                        core.ToggleTask(btn.id);
+                    }
                 }
 
                 InvalidateRect(hwnd, NULL, FALSE);
-                return 0; // Обработали клик, выходим
+                return 0;
             }
         }
         return 0;
     }
 
-    case WM_TIMER: {
-        if (wParam != 1) break;
-        if (!awaitingTaskFromFile) break;
-
-        FILETIME ft;
-        if (!GetFileWriteTime(NEW_TASK_FILE, ft)) break;
-
-        if (CompareFileTime(&ft, &lastTaskFileWriteTime) == 0) break;
-
-        lastTaskFileWriteTime = ft;
-
-        wstring content;
-        if (!TryReadWholeFile(NEW_TASK_FILE, content)) break;
-
-        wstring trimmed = Trim(content);
-        if (!trimmed.empty()) {
-            size_t nl = trimmed.find(L'\n');
-            wstring firstLine = (nl == wstring::npos) ? trimmed : Trim(trimmed.substr(0, nl));
-            if (!firstLine.empty()) {
-                core.AddTask(firstLine);
+    case WM_CHAR: {
+        if (!showModal) break;
+        
+        WCHAR ch = (WCHAR)wParam;
+        if (ch == VK_RETURN || ch == VK_TAB) {
+            if (editingTitle) {
+                editingTitle = false;
             }
-            WriteFileText(NEW_TASK_FILE, L"");
-            awaitingTaskFromFile = false;
-            KillTimer(hwnd, 1);
-            currentScreen = Screen::Tasks;
-            InvalidateRect(hwnd, NULL, FALSE);
+            else if (ch == VK_RETURN && !modalTitle.empty()) {
+                core.AddTask(modalTitle, modalDesc, FormatDateYMD(modalYear, modalMonth, modalDay));
+                showModal = false;
+                modalTitle = L"";
+                modalDesc = L"";
+                if (currentScreen == Screen::Menu) {
+                    currentScreen = Screen::Tasks;
+                }
+            }
         }
+        else if (ch == VK_BACK) {
+            if (editingTitle && !modalTitle.empty()) {
+                modalTitle.pop_back();
+            }
+            else if (!editingTitle && !modalDesc.empty()) {
+                modalDesc.pop_back();
+            }
+        }
+        else if (ch >= 32 && ch != 127) {
+            if (editingTitle && modalTitle.length() < 50) {
+                modalTitle += ch;
+            }
+            else if (!editingTitle && modalDesc.length() < 200) {
+                modalDesc += ch;
+            }
+        }
+        InvalidateRect(hwnd, NULL, FALSE);
         return 0;
     }
+
 
     case WM_DESTROY: PostQuitMessage(0); return 0;
     }
@@ -169,7 +194,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     RegisterClassW(&wc);
 
-    HWND hwnd = CreateWindowExW(0, wc.lpszClassName, L"Todo JSON Manager",
+    HWND hwnd = CreateWindowExW(0, wc.lpszClassName, L"AegisTodo",
         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 450, 700,
         NULL, NULL, hInstance, NULL);
 

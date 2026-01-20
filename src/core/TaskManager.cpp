@@ -1,9 +1,74 @@
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #include "TaskManager.h"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <ctime>
 
 using namespace std;
+
+static string WideToUtf8(const wstring& w) {
+    if (w.empty()) return {};
+    int bytes = WideCharToMultiByte(CP_UTF8, 0, w.c_str(), (int)w.size(), nullptr, 0, nullptr, nullptr);
+    string out(bytes, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, w.c_str(), (int)w.size(), out.data(), bytes, nullptr, nullptr);
+    return out;
+}
+
+static wstring Utf8ToWide(const string& s) {
+    if (s.empty()) return {};
+    int chars = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0);
+    wstring out(chars, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), out.data(), chars);
+    return out;
+}
+
+static wstring EscapeJsonW(const wstring& in) {
+    wstring out;
+    out.reserve(in.size() + 8);
+    for (wchar_t c : in) {
+        switch (c) {
+        case L'\\': out += L"\\\\"; break;
+        case L'"': out += L"\\\""; break;
+        case L'\n': out += L"\\n"; break;
+        case L'\r': out += L"\\r"; break;
+        case L'\t': out += L"\\t"; break;
+        default: out.push_back(c); break;
+        }
+    }
+    return out;
+}
+
+static wstring UnescapeJsonW(const wstring& in) {
+    wstring out;
+    out.reserve(in.size());
+    for (size_t i = 0; i < in.size(); i++) {
+        wchar_t c = in[i];
+        if (c == L'\\' && i + 1 < in.size()) {
+            wchar_t n = in[i + 1];
+            switch (n) {
+            case L'\\': out.push_back(L'\\'); i++; continue;
+            case L'"': out.push_back(L'"'); i++; continue;
+            case L'n': out.push_back(L'\n'); i++; continue;
+            case L'r': out.push_back(L'\r'); i++; continue;
+            case L't': out.push_back(L'\t'); i++; continue;
+            default: break;
+            }
+        }
+        out.push_back(c);
+    }
+    return out;
+}
+
+static wstring NowCreatedAt() {
+    std::time_t t = std::time(nullptr);
+    std::tm tmv{};
+    localtime_s(&tmv, &t);
+    wchar_t buf[17];
+    wcsftime(buf, sizeof(buf) / sizeof(wchar_t), L"%Y-%m-%d %H:%M", &tmv);
+    return buf;
+}
 
 TaskManager::TaskManager() : currentIdCounter(0) {
     Load();
@@ -20,7 +85,7 @@ wstring TaskManager::ExtractJsonValue(const wstring& json, const wstring& key) {
     if (pos < json.length() && json[pos] == L'"') {
         size_t end = json.find(L'"', pos + 1);
         if (end == wstring::npos) return L"";
-        return json.substr(pos + 1, end - pos - 1);
+        return UnescapeJsonW(json.substr(pos + 1, end - pos - 1));
     }
     
     size_t end = json.find_first_of(L",}\n\r", pos);
@@ -29,29 +94,36 @@ wstring TaskManager::ExtractJsonValue(const wstring& json, const wstring& key) {
 }
 
 void TaskManager::Save() {
-    wofstream file(filename.c_str());
-    if (file.is_open()) {
-        file << L"[\n";
-        for (size_t i = 0; i < tasks.size(); ++i) {
-            file << L"  {\n";
-            file << L"    \"id\": " << tasks[i].id << L",\n";
-            file << L"    \"text\": \"" << tasks[i].text << L"\",\n";
-            file << L"    \"isCompleted\": " << (tasks[i].isCompleted ? L"true" : L"false") << L"\n";
-            file << L"  }" << (i < tasks.size() - 1 ? L"," : L"") << L"\n";
-        }
-        file << L"]";
-        file.close();
+    ofstream file(filename.c_str(), ios::binary);
+    if (!file.is_open()) return;
+
+    wstringstream ws;
+    ws << L"[\n";
+    for (size_t i = 0; i < tasks.size(); ++i) {
+        ws << L"  {\n";
+        ws << L"    \"id\": " << tasks[i].id << L",\n";
+        ws << L"    \"text\": \"" << EscapeJsonW(tasks[i].text) << L"\",\n";
+        ws << L"    \"description\": \"" << EscapeJsonW(tasks[i].description) << L"\",\n";
+        ws << L"    \"noteDate\": \"" << EscapeJsonW(tasks[i].noteDate) << L"\",\n";
+        ws << L"    \"createdAt\": \"" << EscapeJsonW(tasks[i].createdAt) << L"\",\n";
+        ws << L"    \"isCompleted\": " << (tasks[i].isCompleted ? L"true" : L"false") << L"\n";
+        ws << L"  }" << (i < tasks.size() - 1 ? L"," : L"") << L"\n";
     }
+    ws << L"]";
+
+    string utf8 = WideToUtf8(ws.str());
+    file.write(utf8.data(), (std::streamsize)utf8.size());
+    file.close();
 }
 
 void TaskManager::Load() {
-    wifstream file(filename.c_str());
+    ifstream file(filename.c_str(), ios::binary);
     if (!file.is_open()) return;
 
-    wstringstream buffer;
-    buffer << file.rdbuf();
-    wstring content = buffer.str();
+    string bytes((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
     file.close();
+
+    wstring content = Utf8ToWide(bytes);
 
     tasks.clear();
     size_t pos = 0;
@@ -64,12 +136,18 @@ void TaskManager::Load() {
         
         wstring idStr = ExtractJsonValue(obj, L"id");
         wstring textStr = ExtractJsonValue(obj, L"text");
+        wstring descStr = ExtractJsonValue(obj, L"description");
+        wstring dateStr = ExtractJsonValue(obj, L"noteDate");
+        wstring createdStr = ExtractJsonValue(obj, L"createdAt");
         wstring boolStr = ExtractJsonValue(obj, L"isCompleted");
 
         if (!idStr.empty()) {
             try { t.id = stoi(idStr); } catch(...) { t.id = 0; }
         }
         t.text = textStr;
+        t.description = descStr;
+        t.noteDate = dateStr;
+        t.createdAt = createdStr;
         t.isCompleted = (boolStr.find(L"true") != std::wstring::npos);
 
         tasks.push_back(t);
@@ -78,8 +156,15 @@ void TaskManager::Load() {
     }
 }
 
-void TaskManager::AddTask(const wstring& text) {
-    tasks.push_back({ currentIdCounter++, text, false });
+void TaskManager::AddTask(const wstring& text, const wstring& description, const wstring& noteDate) {
+    TodoItem item;
+    item.id = currentIdCounter++;
+    item.text = text;
+    item.description = description;
+    item.noteDate = noteDate;
+    item.createdAt = NowCreatedAt();
+    item.isCompleted = false;
+    tasks.push_back(item);
     Save();
 }
 

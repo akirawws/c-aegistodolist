@@ -7,6 +7,9 @@ using namespace std;
 struct TodoItem {
     int id;
     wstring text;
+    wstring description;
+    wstring noteDate;
+    wstring createdAt;
     bool isCompleted;
 };
 
@@ -23,7 +26,7 @@ private:
 
 public:
     TaskManager();
-    void AddTask(const wstring& text);
+    void AddTask(const wstring& text, const wstring& description = L"", const wstring& noteDate = L"");
     void ToggleTask(int id);
     void DeleteTask(int id);
     vector<TodoItem>& GetTasks();
