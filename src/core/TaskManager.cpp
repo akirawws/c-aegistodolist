@@ -3,31 +3,33 @@
 #include <sstream>
 #include <algorithm>
 
+using namespace std;
+
 TaskManager::TaskManager() : currentIdCounter(0) {
     Load();
 }
 
-std::wstring TaskManager::ExtractJsonValue(const std::wstring& json, const std::wstring& key) {
-    std::wstring searchKey = L"\"" + key + L"\":";
+wstring TaskManager::ExtractJsonValue(const wstring& json, const wstring& key) {
+    wstring searchKey = L"\"" + key + L"\":";
     size_t pos = json.find(searchKey);
-    if (pos == std::wstring::npos) return L"";
+    if (pos == wstring::npos) return L"";
 
     pos += searchKey.length();
     while (pos < json.length() && (json[pos] == L' ' || json[pos] == L':')) pos++;
 
     if (pos < json.length() && json[pos] == L'"') {
         size_t end = json.find(L'"', pos + 1);
-        if (end == std::wstring::npos) return L"";
+        if (end == wstring::npos) return L"";
         return json.substr(pos + 1, end - pos - 1);
     }
     
     size_t end = json.find_first_of(L",}\n\r", pos);
-    if (end == std::wstring::npos) end = json.length();
+    if (end == wstring::npos) end = json.length();
     return json.substr(pos, end - pos);
 }
 
 void TaskManager::Save() {
-    std::wofstream file(filename.c_str());
+    wofstream file(filename.c_str());
     if (file.is_open()) {
         file << L"[\n";
         for (size_t i = 0; i < tasks.size(); ++i) {
@@ -43,30 +45,29 @@ void TaskManager::Save() {
 }
 
 void TaskManager::Load() {
-    std::wifstream file(filename.c_str());
+    wifstream file(filename.c_str());
     if (!file.is_open()) return;
 
-    std::wstringstream buffer;
+    wstringstream buffer;
     buffer << file.rdbuf();
-    std::wstring content = buffer.str();
+    wstring content = buffer.str();
     file.close();
 
     tasks.clear();
     size_t pos = 0;
-    while ((pos = content.find(L"{", pos)) != std::wstring::npos) {
+    while ((pos = content.find(L"{", pos)) != wstring::npos) {
         size_t end = content.find(L"}", pos);
-        if (end == std::wstring::npos) break;
+        if (end == wstring::npos) break;
 
-        std::wstring obj = content.substr(pos, end - pos + 1);
+        wstring obj = content.substr(pos, end - pos + 1);
         TodoItem t;
         
-        std::wstring idStr = ExtractJsonValue(obj, L"id");
-        std::wstring textStr = ExtractJsonValue(obj, L"text");
-        std::wstring boolStr = ExtractJsonValue(obj, L"isCompleted");
+        wstring idStr = ExtractJsonValue(obj, L"id");
+        wstring textStr = ExtractJsonValue(obj, L"text");
+        wstring boolStr = ExtractJsonValue(obj, L"isCompleted");
 
-        // Безопасное преобразование числа
         if (!idStr.empty()) {
-            try { t.id = std::stoi(idStr); } catch(...) { t.id = 0; }
+            try { t.id = stoi(idStr); } catch(...) { t.id = 0; }
         }
         t.text = textStr;
         t.isCompleted = (boolStr.find(L"true") != std::wstring::npos);
@@ -77,7 +78,7 @@ void TaskManager::Load() {
     }
 }
 
-void TaskManager::AddTask(const std::wstring& text) {
+void TaskManager::AddTask(const wstring& text) {
     tasks.push_back({ currentIdCounter++, text, false });
     Save();
 }
@@ -94,4 +95,4 @@ void TaskManager::DeleteTask(int id) {
     Save();
 }
 
-std::vector<TodoItem>& TaskManager::GetTasks() { return tasks; }
+vector<TodoItem>& TaskManager::GetTasks() { return tasks; }

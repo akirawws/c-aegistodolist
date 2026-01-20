@@ -2,28 +2,29 @@
 #include <string>
 #include <vector>
 
+using namespace std;
+
 struct TodoItem {
     int id;
-    std::wstring text;
+    wstring text;
     bool isCompleted;
 };
 
 class TaskManager {
 private:
-    std::vector<TodoItem> tasks;
+    vector<TodoItem> tasks;
     int currentIdCounter;
-    const std::string filename = "tasks.json"; // Теперь JSON
+    const string filename = "tasks.json";
 
     void Save();
     void Load();
-    
-    // Помощник для парсинга значений из JSON строки
-    std::wstring ExtractJsonValue(const std::wstring& json, const std::wstring& key);
+
+    wstring ExtractJsonValue(const wstring& json, const wstring& key);
 
 public:
     TaskManager();
-    void AddTask(const std::wstring& text);
+    void AddTask(const wstring& text);
     void ToggleTask(int id);
     void DeleteTask(int id);
-    std::vector<TodoItem>& GetTasks();
+    vector<TodoItem>& GetTasks();
 };

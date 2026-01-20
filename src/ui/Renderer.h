@@ -6,14 +6,21 @@
 #include "../core/TaskManager.h"
 #include "Theme.h"
 
+using namespace std;
+
 struct ClickableArea {
-    std::wstring name;
+    wstring name;
     int id;
     Gdiplus::RectF rect;
 };
 
+enum class Screen {
+    Menu = 0,
+    Tasks = 1
+};
+
 class Renderer {
 public:
-    std::vector<ClickableArea> buttons; 
-    void DrawUI(HDC hdc, int width, int height, std::vector<TodoItem>& tasks);
+    vector<ClickableArea> buttons; 
+    void DrawUI(HDC hdc, int width, int height, vector<TodoItem>& tasks, Screen screen);
 };
