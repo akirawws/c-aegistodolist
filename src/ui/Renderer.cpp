@@ -147,8 +147,7 @@ for (size_t i = 0; i < tasks.size(); ++i) {
 
     bool hasDesc = !tasks[i].description.empty();
     float rowHeight = hasDesc ? 60.0f : 40.0f;
-    
-    // Основной прямоугольник задачи (без полоски)
+
     float stripeWidth = 6.0f;
     float contentX = panelRect.X + 8.0f + stripeWidth;
     float rowWidth = panelRect.Width - 64.0f - stripeWidth;
@@ -156,7 +155,6 @@ for (size_t i = 0; i < tasks.size(); ++i) {
     
     RectF delBtnRect(panelRect.X + panelRect.Width - 44.0f, (REAL)y + 6.0f, 28.0f, 28.0f);
 
-    // Фон задачи — стандартный или затемнённый
     Color bgColor = tasks[i].isCompleted ? COLOR_COMPLETED : COLOR_ITEM;
     SolidBrush bgBrush(bgColor);
     g.FillRectangle(&bgBrush, rowRect);
@@ -169,7 +167,6 @@ for (size_t i = 0; i < tasks.size(); ++i) {
     SolidBrush stripeBrush(stripeColor);
     g.FillRectangle(&stripeBrush, stripeRect);
 
-    // Чекбокс
     RectF checkRect(rowRect.X + 8.0f, rowRect.Y + 8.0f, 20.0f, 20.0f);
     if (tasks[i].isCompleted) {
         SolidBrush checkBrush(COLOR_ACCENT);
@@ -180,7 +177,6 @@ for (size_t i = 0; i < tasks.size(); ++i) {
         g.DrawEllipse(&checkPen, checkRect);
     }
 
-    // Текст
     RectF textRect(rowRect.X + 35.0f, rowRect.Y + 6.0f, rowRect.Width - 45.0f, 20.0f);
     Color textColor = tasks[i].isCompleted ? Color(255, 150, 152, 160) : COLOR_TEXT;
     SolidBrush taskTextBrush(textColor);
@@ -255,7 +251,6 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
     centerFormat.SetAlignment(StringAlignmentCenter);
     centerFormat.SetLineAlignment(StringAlignmentCenter);
 
-    // Название
     RectF titleLabelRect(modalX + 20.0f, modalY + 20.0f, 100.0f, 20.0f);
     g.DrawString(L"Название:", -1, &fontLabel, titleLabelRect, &leftFormat, &labelBrush);
 
@@ -274,7 +269,6 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
     }
     buttons.push_back({ L"MODAL_TITLE", -1, titleInputRect });
 
-    // Описание
     RectF descLabelRect(modalX + 20.0f, modalY + 90.0f, 100.0f, 20.0f);
     g.DrawString(L"Описание:", -1, &fontLabel, descLabelRect, &leftFormat, &labelBrush);
 
@@ -295,7 +289,6 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
     }
     buttons.push_back({ L"MODAL_DESC", -1, descInputRect });
 
-    // Календарь
     RectF dateLabelRect(modalX + 20.0f, modalY + 185.0f, 100.0f, 20.0f);
     g.DrawString(L"Дата:", -1, &fontLabel, dateLabelRect, &leftFormat, &labelBrush);
     wchar_t dateBuf[32];
@@ -349,7 +342,6 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
         }
     }
 
-    // === Время (сдвинуто ниже) ===
     float timeY = modalY + 410.0f;
 
     RectF timeLabelRect(modalX + 20.0f, timeY, 100.0f, 20.0f);
@@ -359,7 +351,6 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
     Pen timeBorderPen(Color(255, 70, 74, 90), 1.0f);
     SolidBrush hourBg(Color(255, 50, 52, 62));
 
-    // Часы
     RectF hourRect(modalX + 80.0f, timeY - 5.0f, 50.0f, 30.0f);
     g.FillRectangle(&hourBg, hourRect);
     g.DrawRectangle(&timeBorderPen, hourRect);
@@ -368,7 +359,6 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
     g.DrawString(hbuf, -1, &fontNormal, hourRect, &centerFormat, &textBrush);
     buttons.push_back({ L"TIME_HOUR", -1, hourRect }); 
 
-    // Минуты
     RectF minRect(modalX + 200.0f, timeY - 5.0f, 50.0f, 30.0f);
     g.FillRectangle(&hourBg, minRect);
     g.DrawRectangle(&timeBorderPen, minRect);
@@ -377,7 +367,6 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
     g.DrawString(mbuf, -1, &fontNormal, minRect, &centerFormat, &textBrush);
     buttons.push_back({ L"TIME_MIN", -1, minRect }); 
 
-    // Кнопки управления
     auto DrawUpDown = [&](float x, float y, const wstring& nameUp, const wstring& nameDown) {
         RectF up(x, y, 20.0f, 14.0f);
         RectF down(x, y + 14.0f, 20.0f, 14.0f);
@@ -388,7 +377,6 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
     DrawUpDown(modalX + 132.0f, timeY - 5.0f, L"TIME_HOUR_UP", L"TIME_HOUR_DOWN");   
     DrawUpDown(modalX + 252.0f, timeY - 5.0f, L"TIME_MIN_UP", L"TIME_MIN_DOWN");
 
-    // Кнопки "Отмена"/"Сохранить"
     float btnY = timeY + 45.0f; 
     RectF cancelBtnRect(modalX + 20.0f, btnY, (modalWidth - 50.0f) / 2.0f, 36.0f);
     DrawButton(g, cancelBtnRect, L"Отмена", Color(255, 70, 74, 90), &fontBold, &textBrush, buttons, L"MODAL_CANCEL", -1);
@@ -429,7 +417,6 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
             Pen colorBorderPen(Color(255, 200, 202, 210), 1.0f);
             g.DrawRectangle(&colorBorderPen, colorRect);
 
-            // Выделить текущий цвет
             if (predefinedColors[i] == selectedColor) {
                 Pen selPen(Color(255, 255, 255, 255), 2.0f);
                 g.DrawRectangle(&selPen, colorRect);
@@ -437,6 +424,4 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
 
             buttons.push_back({ L"COLOR", i, colorRect });
         }
-
-
 }
