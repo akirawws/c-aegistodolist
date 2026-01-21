@@ -20,6 +20,9 @@ static bool editingTitle = false;
 static int modalYear = 0;
 static int modalMonth = 0;
 static int modalDay = 0;
+static int modalHour = 0;
+static int modalMinute = 0;
+static COLORREF modalColor = RGB(60, 63, 75);
 
 static wstring FormatDateYMD(int y, int m, int d) {
     wchar_t buf[11];
@@ -37,6 +40,9 @@ static void OpenModal() {
     modalYear = (int)st.wYear;
     modalMonth = (int)st.wMonth;
     modalDay = (int)st.wDay;
+    modalHour = (int)st.wHour;      
+    modalMinute = (int)st.wMinute;  
+    modalColor = RGB(60, 63, 75); 
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -52,7 +58,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         ui.DrawUI(memDC, rc.right, rc.bottom, core.GetTasks(), currentScreen);
         if (showModal) {
-            ui.DrawModal(memDC, rc.right, rc.bottom, modalTitle, modalDesc, editingTitle, modalYear, modalMonth, modalDay);
+            ui.DrawModal(memDC, rc.right, rc.bottom, modalTitle, modalDesc, editingTitle, modalYear, modalMonth, modalDay, modalHour, modalMinute, modalColor);
         }
 
         BitBlt(hdc, 0, 0, rc.right, rc.bottom, memDC, 0, 0, SRCCOPY);
@@ -82,9 +88,24 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                         modalTitle = L"";
                         modalDesc = L"";
                     }
+                    else if (btn.name == L"COLOR") {
+                    static const COLORREF predefinedColors[] = {
+                        RGB(60, 63, 75), RGB(88, 101, 242), RGB(76, 175, 80),
+                        RGB(244, 67, 54), RGB(255, 152, 0), RGB(156, 39, 176),
+                        RGB(0, 188, 212), RGB(121, 85, 72)
+                    };
+                    if (btn.id >= 0 && btn.id < 8) {
+                        modalColor = predefinedColors[btn.id];
+                    }
+                }
+
                     else if (btn.name == L"MODAL_SAVE") {
                         if (!modalTitle.empty()) {
-                            core.AddTask(modalTitle, modalDesc, FormatDateYMD(modalYear, modalMonth, modalDay));
+                            wchar_t timeBuf[10];
+                            swprintf_s(timeBuf, L"%02d:%02d", modalHour, modalMinute);
+                            wstring timeStr = timeBuf;
+
+                            core.AddTask(modalTitle, modalDesc, FormatDateYMD(modalYear, modalMonth, modalDay), timeStr, modalColor); 
                             showModal = false;
                             modalTitle = L"";
                             modalDesc = L"";
@@ -93,6 +114,19 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                             }
                         }
                     }
+                    else if (btn.name == L"TIME_HOUR_UP") {
+                        modalHour = (modalHour + 1) % 24;
+                    }
+                    else if (btn.name == L"TIME_HOUR_DOWN") {
+                        modalHour = (modalHour - 1 + 24) % 24;
+                    }
+                    else if (btn.name == L"TIME_MIN_UP") {
+                        modalMinute = (modalMinute + 1) % 60;
+                    }
+                    else if (btn.name == L"TIME_MIN_DOWN") {
+                        modalMinute = (modalMinute - 1 + 60) % 60;
+                    }
+
                     else if (btn.name == L"CAL_PREV") {
                         modalMonth--;
                         if (modalMonth < 1) { modalMonth = 12; modalYear--; }
@@ -147,7 +181,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 editingTitle = false;
             }
             else if (ch == VK_RETURN && !modalTitle.empty()) {
-                core.AddTask(modalTitle, modalDesc, FormatDateYMD(modalYear, modalMonth, modalDay));
+                wstring timeStr = L""; 
+                wchar_t timeBuf[10];
+                swprintf_s(timeBuf, L"%02d:%02d", modalHour, modalMinute);
+                timeStr = timeBuf;
+
+                core.AddTask(modalTitle, modalDesc, FormatDateYMD(modalYear, modalMonth, modalDay), timeStr);
                 showModal = false;
                 modalTitle = L"";
                 modalDesc = L"";
@@ -195,7 +234,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     RegisterClassW(&wc);
 
     HWND hwnd = CreateWindowExW(0, wc.lpszClassName, L"AegisTodo",
-        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 450, 700,
+        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 500, 800,
         NULL, NULL, hInstance, NULL);
 
     if (!hwnd) return 0;

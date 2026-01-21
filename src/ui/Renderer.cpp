@@ -18,7 +18,7 @@ static int WeekdayMon0(int year, int month, int day) {
     FILETIME ft{};
     if (!SystemTimeToFileTime(&st, &ft)) return 0;
     ULARGE_INTEGER ui{};
-    ui.LowPart = ft.dwLowDateTime;
+    ui.LowPart = ft.dwLowDateTime; 
     ui.HighPart = ft.dwHighDateTime;
     const unsigned long long days = ui.QuadPart / 864000000000ULL;
     return (int)(days % 7ULL);
@@ -107,9 +107,11 @@ void Renderer::DrawUI(HDC hdc, int width, int height, vector<TodoItem>& tasks, S
                      L"- malevolence: интерфейс\n", -1, &fontP, p1, &leftFormat, &mutedBrush);
 
         RectF p2(panelRect.X + 16.0f, 290.0f, panelRect.Width - 32.0f, 80.0f);
-        g.DrawString(L"Куда обращаться, если будут проблемы (ссылки):\n"
+        g.DrawString(L"Куда не обращаться, если будут проблемы (Telegram)):\n"
                      L"- [@sammocoboi]\n"
-                     L"- [@ak1rrawws]\n", -1, &fontP, p2, &leftFormat, &mutedBrush);
+                     L"- [@ak1rrawws]\n"
+                     L"- [@engenamyocy]\n"
+                     , -1, &fontP, p2, &leftFormat, &mutedBrush);
 
         return;
     }
@@ -140,62 +142,83 @@ void Renderer::DrawUI(HDC hdc, int width, int height, vector<TodoItem>& tasks, S
 
     int y = 110;
     
-    for (size_t i = 0; i < tasks.size(); ++i) {
-        if (y > height - 50) break;
+for (size_t i = 0; i < tasks.size(); ++i) {
+    if (y > height - 50) break;
 
-        bool hasDesc = !tasks[i].description.empty();
-        float rowHeight = hasDesc ? 60.0f : 40.0f;
-        RectF rowRect(panelRect.X + 8.0f, (REAL)y, panelRect.Width - 64.0f, rowHeight);
-        RectF delBtnRect(panelRect.X + panelRect.Width - 44.0f, (REAL)y + 6.0f, 28.0f, 28.0f);
+    bool hasDesc = !tasks[i].description.empty();
+    float rowHeight = hasDesc ? 60.0f : 40.0f;
+    
+    // Основной прямоугольник задачи (без полоски)
+    float stripeWidth = 6.0f;
+    float contentX = panelRect.X + 8.0f + stripeWidth;
+    float rowWidth = panelRect.Width - 64.0f - stripeWidth;
+    RectF rowRect(contentX, (REAL)y, rowWidth, rowHeight);
+    
+    RectF delBtnRect(panelRect.X + panelRect.Width - 44.0f, (REAL)y + 6.0f, 28.0f, 28.0f);
 
-        Color taskColor = tasks[i].isCompleted ? COLOR_COMPLETED : COLOR_ITEM;
-        SolidBrush taskBrush(taskColor);
-        g.FillRectangle(&taskBrush, rowRect);
+    // Фон задачи — стандартный или затемнённый
+    Color bgColor = tasks[i].isCompleted ? COLOR_COMPLETED : COLOR_ITEM;
+    SolidBrush bgBrush(bgColor);
+    g.FillRectangle(&bgBrush, rowRect);
+    RectF stripeRect(panelRect.X + 8.0f, (REAL)y, stripeWidth, rowHeight);
+    Color stripeColor(
+        GetRValue(tasks[i].color),
+        GetGValue(tasks[i].color),
+        GetBValue(tasks[i].color)
+    );
+    SolidBrush stripeBrush(stripeColor);
+    g.FillRectangle(&stripeBrush, stripeRect);
 
-        RectF checkRect(rowRect.X + 8.0f, rowRect.Y + 8.0f, 20.0f, 20.0f);
-        if (tasks[i].isCompleted) {
-            SolidBrush checkBrush(COLOR_ACCENT);
-            g.FillEllipse(&checkBrush, checkRect);
-            g.DrawString(L"✓", -1, &fontBold, checkRect, &centerFormat, &textBrush);
-        } else {
-            Pen checkPen(Color(255, 120, 123, 140), 2.0f);
-            g.DrawEllipse(&checkPen, checkRect);
-        }
-
-        RectF textRect(rowRect.X + 35.0f, rowRect.Y + 6.0f, rowRect.Width - 45.0f, 20.0f);
-        Color textColor = tasks[i].isCompleted ? Color(255, 150, 152, 160) : COLOR_TEXT;
-        SolidBrush taskTextBrush(textColor);
-        g.DrawString(tasks[i].text.c_str(), -1, &fontNormal, textRect, &leftFormat, &taskTextBrush);
-
-        if (hasDesc) {
-            RectF descRect(rowRect.X + 35.0f, rowRect.Y + 28.0f, rowRect.Width - 45.0f, 20.0f);
-            g.DrawString(tasks[i].description.c_str(), -1, &fontSmall, descRect, &leftFormat, &descBrush);
-        }
-        
-        if (!tasks[i].noteDate.empty() || !tasks[i].createdAt.empty()) {
-            wstring meta = tasks[i].noteDate;
-            if (!tasks[i].createdAt.empty()) {
-                if (!meta.empty()) meta += L"  •  ";
-                meta += tasks[i].createdAt;
-            }
-            RectF metaRect(rowRect.X + 35.0f, rowRect.Y + (hasDesc ? 46.0f : 26.0f), rowRect.Width - 45.0f, 14.0f);
-            SolidBrush metaBrush(Color(255, 140, 142, 150));
-            Font fontMeta(&ff, 10, FontStyleRegular, UnitPixel);
-            g.DrawString(meta.c_str(), -1, &fontMeta, metaRect, &leftFormat, &metaBrush);
-        }
-
-        SolidBrush delBrush(COLOR_DELETE);
-        g.FillRectangle(&delBrush, delBtnRect);
-        g.DrawString(L"✕", -1, &fontBold, delBtnRect, &centerFormat, &textBrush);
-
-        buttons.push_back({ L"DEL", tasks[i].id, delBtnRect });
-        buttons.push_back({ L"TOGGLE", tasks[i].id, rowRect });
-
-        y += (int)rowHeight + 10;
+    // Чекбокс
+    RectF checkRect(rowRect.X + 8.0f, rowRect.Y + 8.0f, 20.0f, 20.0f);
+    if (tasks[i].isCompleted) {
+        SolidBrush checkBrush(COLOR_ACCENT);
+        g.FillEllipse(&checkBrush, checkRect);
+        g.DrawString(L"✓", -1, &fontBold, checkRect, &centerFormat, &textBrush);
+    } else {
+        Pen checkPen(Color(255, 120, 123, 140), 2.0f);
+        g.DrawEllipse(&checkPen, checkRect);
     }
+
+    // Текст
+    RectF textRect(rowRect.X + 35.0f, rowRect.Y + 6.0f, rowRect.Width - 45.0f, 20.0f);
+    Color textColor = tasks[i].isCompleted ? Color(255, 150, 152, 160) : COLOR_TEXT;
+    SolidBrush taskTextBrush(textColor);
+    g.DrawString(tasks[i].text.c_str(), -1, &fontNormal, textRect, &leftFormat, &taskTextBrush);
+
+    if (hasDesc) {
+        RectF descRect(rowRect.X + 35.0f, rowRect.Y + 28.0f, rowRect.Width - 45.0f, 20.0f);
+        g.DrawString(tasks[i].description.c_str(), -1, &fontSmall, descRect, &leftFormat, &descBrush);
+    }
+    
+    if (!tasks[i].noteDate.empty() || !tasks[i].createdAt.empty()) {
+        wstring meta = tasks[i].noteDate;
+        if (!tasks[i].noteTime.empty()) {
+            if (!meta.empty()) meta += L" ";
+            meta += tasks[i].noteTime;
+        }
+        if (!tasks[i].createdAt.empty()) {
+            if (!meta.empty()) meta += L"  •  ";
+            meta += tasks[i].createdAt;
+        }
+        RectF metaRect(rowRect.X + 35.0f, rowRect.Y + (hasDesc ? 46.0f : 26.0f), rowRect.Width - 45.0f, 14.0f);
+        SolidBrush metaBrush(Color(255, 140, 142, 150));
+        Font fontMeta(&ff, 10, FontStyleRegular, UnitPixel);
+        g.DrawString(meta.c_str(), -1, &fontMeta, metaRect, &leftFormat, &metaBrush);
+    }
+
+    SolidBrush delBrush(COLOR_DELETE);
+    g.FillRectangle(&delBrush, delBtnRect);
+    g.DrawString(L"✕", -1, &fontBold, delBtnRect, &centerFormat, &textBrush);
+
+    buttons.push_back({ L"DEL", tasks[i].id, delBtnRect });
+    buttons.push_back({ L"TOGGLE", tasks[i].id, rowRect });
+
+    y += (int)rowHeight + 10;
+}
 }
 
-void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleText, const wstring& descText, bool editingTitle, int year, int month, int day) {
+void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleText, const wstring& descText, bool editingTitle,int year, int month, int day, int hour, int minute,COLORREF selectedColor) {
     Graphics g(hdc);
     g.SetSmoothingMode(SmoothingModeAntiAlias);
     
@@ -204,8 +227,8 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
     SolidBrush overlayBrush(Color(180, 0, 0, 0));
     g.FillRectangle(&overlayBrush, 0, 0, width, height);
 
-    float modalWidth = 400.0f;
-    float modalHeight = 440.0f;
+    float modalWidth = 460.0f;      
+    float modalHeight = 620.0f;   
     float modalX = ((REAL)width - modalWidth) / 2.0f;
     float modalY = ((REAL)height - modalHeight) / 2.0f;
     RectF modalRect(modalX, modalY, modalWidth, modalHeight);
@@ -232,6 +255,7 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
     centerFormat.SetAlignment(StringAlignmentCenter);
     centerFormat.SetLineAlignment(StringAlignmentCenter);
 
+    // Название
     RectF titleLabelRect(modalX + 20.0f, modalY + 20.0f, 100.0f, 20.0f);
     g.DrawString(L"Название:", -1, &fontLabel, titleLabelRect, &leftFormat, &labelBrush);
 
@@ -250,6 +274,7 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
     }
     buttons.push_back({ L"MODAL_TITLE", -1, titleInputRect });
 
+    // Описание
     RectF descLabelRect(modalX + 20.0f, modalY + 90.0f, 100.0f, 20.0f);
     g.DrawString(L"Описание:", -1, &fontLabel, descLabelRect, &leftFormat, &labelBrush);
 
@@ -270,7 +295,7 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
     }
     buttons.push_back({ L"MODAL_DESC", -1, descInputRect });
 
-    // Calendar
+    // Календарь
     RectF dateLabelRect(modalX + 20.0f, modalY + 185.0f, 100.0f, 20.0f);
     g.DrawString(L"Дата:", -1, &fontLabel, dateLabelRect, &leftFormat, &labelBrush);
     wchar_t dateBuf[32];
@@ -324,9 +349,94 @@ void Renderer::DrawModal(HDC hdc, int width, int height, const wstring& titleTex
         }
     }
 
-    RectF cancelBtnRect(modalX + 20.0f, modalY + 395.0f, (modalWidth - 50.0f) / 2.0f, 36.0f);
+    // === Время (сдвинуто ниже) ===
+    float timeY = modalY + 410.0f;
+
+    RectF timeLabelRect(modalX + 20.0f, timeY, 100.0f, 20.0f);
+    g.DrawString(L"Время:", -1, &fontLabel, timeLabelRect, &leftFormat, &labelBrush);
+
+
+    Pen timeBorderPen(Color(255, 70, 74, 90), 1.0f);
+    SolidBrush hourBg(Color(255, 50, 52, 62));
+
+    // Часы
+    RectF hourRect(modalX + 80.0f, timeY - 5.0f, 50.0f, 30.0f);
+    g.FillRectangle(&hourBg, hourRect);
+    g.DrawRectangle(&timeBorderPen, hourRect);
+    wchar_t hbuf[8];
+    swprintf_s(hbuf, L"%02d", hour);
+    g.DrawString(hbuf, -1, &fontNormal, hourRect, &centerFormat, &textBrush);
+    buttons.push_back({ L"TIME_HOUR", -1, hourRect }); 
+
+    // Минуты
+    RectF minRect(modalX + 200.0f, timeY - 5.0f, 50.0f, 30.0f);
+    g.FillRectangle(&hourBg, minRect);
+    g.DrawRectangle(&timeBorderPen, minRect);
+    wchar_t mbuf[8];
+    swprintf_s(mbuf, L"%02d", minute);
+    g.DrawString(mbuf, -1, &fontNormal, minRect, &centerFormat, &textBrush);
+    buttons.push_back({ L"TIME_MIN", -1, minRect }); 
+
+    // Кнопки управления
+    auto DrawUpDown = [&](float x, float y, const wstring& nameUp, const wstring& nameDown) {
+        RectF up(x, y, 20.0f, 14.0f);
+        RectF down(x, y + 14.0f, 20.0f, 14.0f);
+        DrawButton(g, up, L"▲", Color(255, 70, 74, 90), &fontBold, &textBrush, buttons, nameUp, -1);
+        DrawButton(g, down, L"▼", Color(255, 70, 74, 90), &fontBold, &textBrush, buttons, nameDown, -1);
+    };
+
+    DrawUpDown(modalX + 132.0f, timeY - 5.0f, L"TIME_HOUR_UP", L"TIME_HOUR_DOWN");   
+    DrawUpDown(modalX + 252.0f, timeY - 5.0f, L"TIME_MIN_UP", L"TIME_MIN_DOWN");
+
+    // Кнопки "Отмена"/"Сохранить"
+    float btnY = timeY + 45.0f; 
+    RectF cancelBtnRect(modalX + 20.0f, btnY, (modalWidth - 50.0f) / 2.0f, 36.0f);
     DrawButton(g, cancelBtnRect, L"Отмена", Color(255, 70, 74, 90), &fontBold, &textBrush, buttons, L"MODAL_CANCEL", -1);
 
-    RectF saveBtnRect(modalX + 30.0f + (modalWidth - 50.0f) / 2.0f, modalY + 395.0f, (modalWidth - 50.0f) / 2.0f, 36.0f);
+    RectF saveBtnRect(modalX + 30.0f + (modalWidth - 50.0f) / 2.0f, btnY, (modalWidth - 50.0f) / 2.0f, 36.0f);
     DrawButton(g, saveBtnRect, L"Сохранить", COLOR_ACCENT, &fontBold, &textBrush, buttons, L"MODAL_SAVE", -1);
+
+
+    float colorY = btnY + 40.0f;
+        RectF colorLabelRect(modalX + 20.0f, colorY, 100.0f, 20.0f);
+        g.DrawString(L"Цвет:", -1, &fontLabel, colorLabelRect, &leftFormat, &labelBrush);
+
+
+        static const COLORREF predefinedColors[] = {
+            RGB(60, 63, 75),   
+            RGB(88, 101, 242),
+            RGB(76, 175, 80),  
+            RGB(244, 67, 54),  
+            RGB(255, 152, 0),  
+            RGB(156, 39, 176), 
+            RGB(0, 188, 212), 
+            RGB(121, 85, 72)  
+        };
+
+        const int colorCount = sizeof(predefinedColors) / sizeof(predefinedColors[0]);
+        float colorSize = 24.0f;
+        float totalWidth = colorCount * colorSize + (colorCount - 1) * 6.0f;
+        float startX = modalX + (modalWidth - totalWidth) / 2.0f;
+
+        for (int i = 0; i < colorCount; ++i) {
+            RectF colorRect(startX + i * (colorSize + 6.0f), colorY + 25.0f, colorSize, colorSize);
+            SolidBrush colorBrush(Color(
+                GetRValue(predefinedColors[i]),
+                GetGValue(predefinedColors[i]),
+                GetBValue(predefinedColors[i])
+            ));
+            g.FillRectangle(&colorBrush, colorRect);
+            Pen colorBorderPen(Color(255, 200, 202, 210), 1.0f);
+            g.DrawRectangle(&colorBorderPen, colorRect);
+
+            // Выделить текущий цвет
+            if (predefinedColors[i] == selectedColor) {
+                Pen selPen(Color(255, 255, 255, 255), 2.0f);
+                g.DrawRectangle(&selPen, colorRect);
+            }
+
+            buttons.push_back({ L"COLOR", i, colorRect });
+        }
+
+
 }

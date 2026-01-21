@@ -5,6 +5,8 @@
 #include <sstream>
 #include <algorithm>
 #include <ctime>
+#include <iomanip>
+
 
 using namespace std;
 
@@ -106,8 +108,15 @@ void TaskManager::Save() {
         ws << L"    \"description\": \"" << EscapeJsonW(tasks[i].description) << L"\",\n";
         ws << L"    \"noteDate\": \"" << EscapeJsonW(tasks[i].noteDate) << L"\",\n";
         ws << L"    \"createdAt\": \"" << EscapeJsonW(tasks[i].createdAt) << L"\",\n";
+        ws << L"    \"noteTime\": \"" << EscapeJsonW(tasks[i].noteTime) << L"\",\n";
         ws << L"    \"isCompleted\": " << (tasks[i].isCompleted ? L"true" : L"false") << L"\n";
         ws << L"  }" << (i < tasks.size() - 1 ? L"," : L"") << L"\n";
+        ws << L"    \"color\": \"#" 
+        << std::hex << std::uppercase << std::setfill(L'0')
+        << std::setw(2) << (tasks[i].color & 0xFF)        
+        << std::setw(2) << ((tasks[i].color >> 8) & 0xFF) 
+        << std::setw(2) << ((tasks[i].color >> 16) & 0xFF) 
+        << L"\",\n";
     }
     ws << L"]";
 
@@ -139,7 +148,16 @@ void TaskManager::Load() {
         wstring descStr = ExtractJsonValue(obj, L"description");
         wstring dateStr = ExtractJsonValue(obj, L"noteDate");
         wstring createdStr = ExtractJsonValue(obj, L"createdAt");
+        wstring timeStr = ExtractJsonValue(obj, L"noteTime");
         wstring boolStr = ExtractJsonValue(obj, L"isCompleted");
+        wstring colorStr = ExtractJsonValue(obj, L"color");
+        COLORREF color = RGB(60, 63, 75);
+        if (!colorStr.empty() && colorStr.length() == 7 && colorStr[0] == L'#') {
+            unsigned int r = 0, g = 0, b = 0;
+            swscanf_s(colorStr.c_str() + 1, L"%2x%2x%2x", &r, &g, &b);
+            color = RGB((BYTE)r, (BYTE)g, (BYTE)b);
+        }
+
 
         if (!idStr.empty()) {
             try { t.id = stoi(idStr); } catch(...) { t.id = 0; }
@@ -148,6 +166,8 @@ void TaskManager::Load() {
         t.description = descStr;
         t.noteDate = dateStr;
         t.createdAt = createdStr;
+        t.noteTime = timeStr;
+        t.color = color;
         t.isCompleted = (boolStr.find(L"true") != std::wstring::npos);
 
         tasks.push_back(t);
@@ -156,14 +176,16 @@ void TaskManager::Load() {
     }
 }
 
-void TaskManager::AddTask(const wstring& text, const wstring& description, const wstring& noteDate) {
+void TaskManager::AddTask(const wstring& text, const wstring& description, const wstring& noteDate, const wstring& noteTime, COLORREF color) {
     TodoItem item;
     item.id = currentIdCounter++;
     item.text = text;
     item.description = description;
     item.noteDate = noteDate;
+    item.noteTime = noteTime;
     item.createdAt = NowCreatedAt();
     item.isCompleted = false;
+    item.color = color; 
     tasks.push_back(item);
     Save();
 }

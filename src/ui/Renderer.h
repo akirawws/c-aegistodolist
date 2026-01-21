@@ -25,5 +25,8 @@ class Renderer {
 public:
     vector<ClickableArea> buttons; 
     void DrawUI(HDC hdc, int width, int height, vector<TodoItem>& tasks, Screen screen);
-    void DrawModal(HDC hdc, int width, int height, const wstring& titleText, const wstring& descText, bool editingTitle, int year, int month, int day);
+    void DrawModal(HDC hdc, int width, int height,
+               const wstring& titleText, const wstring& descText, bool editingTitle,
+               int year, int month, int day, int hour, int minute,
+               COLORREF selectedColor);
 };

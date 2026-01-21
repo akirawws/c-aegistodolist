@@ -8,9 +8,11 @@ struct TodoItem {
     int id;
     wstring text;
     wstring description;
-    wstring noteDate;
+    wstring noteDate;  
+    wstring noteTime; 
     wstring createdAt;
     bool isCompleted;
+    COLORREF color;
 };
 
 class TaskManager {
@@ -26,7 +28,7 @@ private:
 
 public:
     TaskManager();
-    void AddTask(const wstring& text, const wstring& description = L"", const wstring& noteDate = L"");
+    void AddTask(const wstring& text, const wstring& description = L"", const wstring& noteDate = L"", const wstring& noteTime = L"", COLORREF color = RGB(60, 63, 75));
     void ToggleTask(int id);
     void DeleteTask(int id);
     vector<TodoItem>& GetTasks();
