@@ -7,7 +7,7 @@
 #include <ctime>
 #include <iomanip>
 
-
+//хуй
 using namespace std;
 
 static string WideToUtf8(const wstring& w) {
